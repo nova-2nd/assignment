@@ -1,1 +1,3 @@
-t.b.d
+create your venv (python3 -m venv .venv)
+activate your venv (. .venv/bin/activate)
+install requirements (pip install -r requiremnts.txt)
