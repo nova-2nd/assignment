@@ -1,6 +1,6 @@
 from diagrams import Diagram, Cluster, Edge
 from diagrams.aws.compute import Fargate, ECS, EC2ElasticIpAddress, ElasticContainerServiceService, ElasticContainerServiceContainer
-from diagrams.aws.network import ALB, RouteTable, IGW, VPC, NATGateway, PrivateSubnet, PublicSubnet
+from diagrams.aws.network import ALB, RouteTable, IGW, VPC, NATGateway, PrivateSubnet, PublicSubnet, Nacl
 
 with Diagram("Assignment Architecture", show=False, filename="architecture_diagram"):
     mainrt = RouteTable("Main route table\n(nginx-demo-main-rt)")
@@ -13,6 +13,8 @@ with Diagram("Assignment Architecture", show=False, filename="architecture_diagr
         nginx_demo_pub_az_b_eip = EC2ElasticIpAddress("EIP\n(nginx-demo-pub-az-b-eip)")
         nginx_demo_pub_az_c_eip = EC2ElasticIpAddress("EIP\n(nginx-demo-pub-az-c-eip)")
         alb_ingress = ALB("Listener: HTTP\nListener:HTTPS")
+        sg_ecs = Nacl("Security Group\n(nginx-demo-ecs-service)\nIngress:TCP/80 <- 0.0.0.0/0\nEgress: UDP/53 -> 0.0.0.0/0\nEgress:TCP/53 -> 0.0.0.0/0\nEgress:TCP/443 -> 0.0.0.0/0")
+        sg_lb = Nacl("Security Group\n(nginx-demo-lb-sg)\nIngress:TCP/80 <- 0.0.0.0/0\nIngress:TCP/443 <- 0.0.0.0/0\nEgress:TCP/80 -> nginx-demo-ecs-service")
         with Cluster("Availability Zone A"):
             with Cluster("Pub Subnet 1"):
                 lb_aza = ALB("ALB AZ A\n(nginx-demo-lb)")
@@ -54,3 +56,5 @@ with Diagram("Assignment Architecture", show=False, filename="architecture_diagr
     fg_node1 << cont1
     fg_node2 << cont2
     fg_node3 << cont3
+    sg_lb >> Edge(minlen="4") >> [lb_aza, lb_azb, lb_azc]
+    sg_ecs >> [fg_node1, fg_node2, fg_node3]
