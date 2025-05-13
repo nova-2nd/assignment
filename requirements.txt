@@ -1,3 +1,4 @@
 ansible==11.5.0
 ansible-lint==25.4.0
+boto3==1.38.14
 diagrams==0.24.4
