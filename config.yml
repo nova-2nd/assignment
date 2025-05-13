@@ -1,0 +1,11 @@
+---
+config:
+  vpc:
+    name: nginx-demo
+    dhcp_opts: nginx-demo-dopts
+    cidr: 10.0.0.0/16
+    subnets:
+      - name: 123
+        cidr: 1234
+      - name: 123
+

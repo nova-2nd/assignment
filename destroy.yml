@@ -1,0 +1,25 @@
+---
+- name: Create nginx-demo
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Find our VPC
+      amazon.aws.ec2_vpc_net_info:
+        filters:
+          "tag:Name": "{{ config.vpc.name }}"
+      register: runstate
+    - name: Dump
+      ansible.builtin.debug:
+        msg: "{{ runstate }}"
+        # var: config.nginxdemo.vpc.name
+    - name: Delete our VPC
+      # when: 0 > 1
+      amazon.aws.ec2_vpc_net:
+        vpc_id: "{{ item.id }}"
+        state: absent
+      loop: "{{ runstate.vpcs }}"
+    - name: Delete DHCP option set
+      amazon.aws.ec2_vpc_dhcp_option:
+        dhcp_options_id: "{{ item.dhcp_options_id }}"
+        state: absent
+      loop: "{{ runstate.vpcs }}"
