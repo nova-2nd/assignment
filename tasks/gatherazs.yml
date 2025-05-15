@@ -1,0 +1,20 @@
+---
+# Gather availability zone of the region we are running in, results are written back to the state
+# (config/vpc/azs) A: regionname, B: regionname, etc
+# https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html
+
+- name: Gather available AZ's
+  amazon.aws.aws_az_info:
+  register: result
+
+- name: Extract AZ zone info
+  vars:
+    azs: []
+  ansible.builtin.set_fact:
+    azs: "{{ azs + [item.zone_name] }}"
+  loop: "{{ result.availability_zones }}"
+
+- name: Dump AZ info into state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'azs': {item[-1] | upper: item}}}, recursive=true) }}"
+  loop: "{{ azs }}"

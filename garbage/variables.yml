@@ -1,0 +1,38 @@
+---
+- name: Variable play
+  hosts: localhost
+  gather_facts: false
+  vars:
+    id: id
+    value: value
+    config:
+      eips:
+        nginx_demo_pub_az_a_eip:
+          id:
+          ip:
+        nginx-demo-pub-az-b-eip:
+          id:
+          ip:
+        nginx-demo-pub-az-c-eip:
+          id:
+          ip:
+      subnets:
+        nginx-demo-pub-az-a:
+          cidr:
+        nginx-demo-pub-az-b:
+          cidr:
+        nginx-demo-pub-az-c:
+          cidr:
+        nginx-demo-priv-az-a:
+          cidr:
+        nginx-demo-priv-az-b:
+          cidr:
+        nginx-demo-priv-az-c:
+          cidr:
+  tasks:
+    - name: Create vpc
+      ansible.builtin.import_tasks:
+        file: vpc-task-test.yml
+    - name: Dump vars
+      ansible.builtin.debug:
+        msg: "{{ config.eips.nginx_demo_pub_az_a_eip.id }}"

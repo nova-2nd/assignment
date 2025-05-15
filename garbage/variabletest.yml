@@ -1,0 +1,14 @@
+---
+- name: Create nginx-demo
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Dump vpc var
+      ansible.builtin.debug:
+        var: config
+    - name: Gather available az's
+      amazon.aws.aws_az_info:
+      register: azs
+    - name: Dump az's
+      ansible.builtin.debug:
+        var: azs

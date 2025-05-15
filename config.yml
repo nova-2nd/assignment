@@ -1,11 +1,56 @@
 ---
 config:
   vpc:
-    name: nginx-demo
-    dhcp_opts: nginx-demo-dopts
+    name: nginx_demo
     cidr: 10.0.0.0/16
+    dopt_name: nginx_demo_dopts
+    igws:
+      nginx_demo_igw:
+        name: nginx_demo_igw
+    rtbs:
+      nginx_demo_main_rt:
+        name: nginx_demo_main_rt
     subnets:
-      - name: 123
-        cidr: 1234
-      - name: 123
+      nginx_demo_pub_az_a:
+        name: nginx_demo_pub_az_a
+        cidr: 10.0.1.0/24
+        route_table: nginx_demo_pub_rt
+        az: A
+      nginx_demo_pub_az_b:
+        name: nginx_demo_pub_az_b
+        cidr: 10.0.2.0/24
+        route_table: nginx_demo_pub_rt
+        az: B
+      nginx_demo_pub_az_c:
+        name: nginx_demo_pub_az_c
+        cidr: 10.0.3.0/24
+        route_table: nginx_demo_pub_rt
+        az: C
+      nginx_demo_priv_az_a:
+        name: nginx_demo_priv_az_a
+        cidr: 10.0.11.0/24
+        route_table: nginx_demo_priv_az_a_rt
+        az: A
+      nginx_demo_priv_az_b:
+        name: nginx_demo_priv_az_b
+        cidr: 10.0.12.0/24
+        route_table: nginx_demo_priv_az_b_rt
+        az: B
+      nginx_demo_priv_az_c:
+        name: nginx_demo_priv_az_c
+        cidr: 10.0.13.0/24
+        route_table: nginx_demo_priv_az_c_rt
+        az: C
 
+
+    ngws:
+      nginx-demo-priv-az-a-ng:
+        subnet: nginx-demo-pub-az-a
+      nginx-demo-priv-az-b-ng:
+        subnet: nginx-demo-pub-az-b
+      nginx-demo-priv-az-c-ng:
+        subnet: nginx-demo-pub-az-c
+    eips:
+      nginx-demo-pub-az-a-eip:
+      nginx-demo-pub-az-b-eip:
+      nginx-demo-pub-az-c-eip:

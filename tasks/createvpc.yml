@@ -1,0 +1,71 @@
+---
+- name: Create VPC
+  amazon.aws.ec2_vpc_net:
+    name: "{{ state.vpc.name }}"
+    cidr_block: "{{ state.vpc.cidr }}"
+    dns_hostnames: false
+  register: result
+
+- name: Dump VPC info into state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {item.key: item.value}}, recursive=true) }}"
+  loop:
+    - { key: 'vpcid', value: "{{ result.vpc.id }}" }
+    - { key: 'dopt_id', value: "{{ result.vpc.dhcp_options_id }}" }
+
+- name: Rename DHCP option state
+  amazon.aws.ec2_vpc_dhcp_option:
+    dhcp_options_id: "{{ state.vpc.dopt_id }}"
+    tags:
+      Name: "{{ state.vpc.dopt_name }}"
+
+- name: Gather routing table info
+  amazon.aws.ec2_vpc_route_table_info:
+    filters:
+      vpc-id: "{{ state.vpc.vpcid }}"
+      association.main: true
+  register: result
+
+- name: Dump route table info into state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'rtbs': {'nginx_demo_main_rt': {item.key: item.value}}}}, recursive=true) }}"
+  loop:
+    - { key: 'id', value: "{{ result.route_tables[0].id }}" }
+
+- name: Rename main routing table
+  amazon.aws.ec2_vpc_route_table:
+    vpc_id: "{{ state.vpc.vpcid }}"
+    lookup: id
+    purge_tags: true
+    route_table_id: "{{ state.vpc.rtbs.nginx_demo_main_rt.id }}"
+    tags:
+      Name: "{{ state.vpc.rtbs.nginx_demo_main_rt.name }}"
+
+- name: Create internet gateway
+  amazon.aws.ec2_vpc_igw:
+    vpc_id: "{{ state.vpc.vpcid }}"
+    state: present
+    tags:
+      Name: "{{ state.vpc.igws.nginx_demo_igw.name }}"
+  register: result
+
+- name: Dump internet gateway info into state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'igws': {'nginx_demo_igw': {item.key: item.value}}}}, recursive=true) }}"
+  loop:
+    - { key: 'id', value: "{{ result.gateway_id }}" }
+
+- name: Subnet data
+  amazon.aws.ec2_vpc_subnet:
+    vpc_id: "{{ state.vpc.vpcid }}"
+    cidr: "{{ item.value.cidr }}"
+    az: "{{ state.vpc.azs[item.value.az] }}"
+    tags:
+      Name: "{{ item.value.name }}"
+  loop: "{{ lookup('dict', state.vpc.subnets) }}"
+  register: result
+
+- name: Dump subnet info into state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'subnets': {item.subnet.tags.Name: {'id': item.subnet.id}}}}, recursive=true) }}"
+  loop: "{{ result.results }}"

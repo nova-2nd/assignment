@@ -1,0 +1,20 @@
+---
+- name: Destroy nginx-demo
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Copy config to state
+      ansible.builtin.set_fact:
+        state: "{{ config }}"
+
+    - name: Gather state info
+      ansible.builtin.import_tasks:
+        file: tasks/gatherstate.yml
+
+    - name: Destroy VPC
+      ansible.builtin.import_tasks:
+        file: tasks/destroyvpc.yml
+
+    - name: Dump state
+      ansible.builtin.debug:
+        var: state

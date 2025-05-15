@@ -1,0 +1,14 @@
+- name: Delete internet gateway
+  amazon.aws.ec2_vpc_igw:
+    vpc_id: "{{ state.vpc.vpcid }}"
+    state: absent
+
+- name: Delete vpc
+  amazon.aws.ec2_vpc_net:
+    vpc_id: "{{ state.vpc.vpcid }}"
+    state: absent
+
+- name: Delete DHCP option state
+  amazon.aws.ec2_vpc_dhcp_option:
+    dhcp_options_id: "{{ state.vpc.dopt_id }}"
+    state: absent

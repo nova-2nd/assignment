@@ -1,0 +1,30 @@
+---
+- name: Create nginx-demo
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Create VPC
+      amazon.aws.ec2_vpc_net:
+        name: "{{ config.vpc.name }}"
+        cidr_block: "{{ config.vpc.cidr }}"
+      register: vpc
+    - name: Rename DHCP option set
+      amazon.aws.ec2_vpc_dhcp_option:
+        dhcp_options_id: "{{ vpc.vpc.dhcp_options_id }}"
+        tags:
+          Name: "{{ config.vpc.dhcp_opts }}"
+    - name: Crete internet gateway
+      amazon.aws.ec2_vpc_igw:
+        vpc_id: "{{ vpc.vpc.id }}"
+        tags:
+          Name: "{{ config.vpc.igw }}"
+    - name: Gather avalability zones
+      amazon.aws.aws_az_info:
+      register: stateaz
+    - name: save azs
+      ansible.builtin.set_fact:
+        config: "{{ config| combine(item.key)}}"
+      with_item: "{{ stateaz.availability_zones }}"
+    - name: Dump config
+      ansible.builtin.debug:
+        msg: "{{ config }}"

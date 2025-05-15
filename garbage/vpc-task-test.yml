@@ -1,0 +1,7 @@
+---
+- name: set var
+  ansible.builtin.set_fact:
+    eip: nginx_demo_pub_az_a_eip
+- name: Set variable
+  ansible.builtin.set_fact:
+    config: "{{ config | combine({ 'eips': { eip : { 'id': '1234' }}}, recursive=true )}}"
