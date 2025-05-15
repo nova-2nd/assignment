@@ -10,6 +10,19 @@ config:
     rtbs:
       nginx_demo_main_rt:
         name: nginx_demo_main_rt
+        main: true
+      nginx_demo_pub_rt:
+        name: nginx_demo_pub_rt
+        gateway: nginx_demo_igw
+      nginx_demo_priv_az_a_rt:
+        name: nginx_demo_priv_az_a_rt
+        gateway: nginx_demo_priv_az_a_ng
+      nginx_demo_priv_az_b_rt:
+        name: nginx_demo_priv_az_b_rt
+        gateway: nginx_demo_priv_az_b_ng
+      nginx_demo_priv_az_c_rt:
+        name: nginx_demo_priv_az_c_rt
+        gateway: nginx_demo_priv_az_c_ng
     subnets:
       nginx_demo_pub_az_a:
         name: nginx_demo_pub_az_a
@@ -41,16 +54,23 @@ config:
         cidr: 10.0.13.0/24
         route_table: nginx_demo_priv_az_c_rt
         az: C
-
-
-    ngws:
-      nginx-demo-priv-az-a-ng:
-        subnet: nginx-demo-pub-az-a
-      nginx-demo-priv-az-b-ng:
-        subnet: nginx-demo-pub-az-b
-      nginx-demo-priv-az-c-ng:
-        subnet: nginx-demo-pub-az-c
     eips:
-      nginx-demo-pub-az-a-eip:
-      nginx-demo-pub-az-b-eip:
-      nginx-demo-pub-az-c-eip:
+      nginx_demo_pub_az_a_eip:
+        name: nginx_demo_pub_az_a_eip
+      nginx_demo_pub_az_b_eip:
+        name: nginx_demo_pub_az_b_eip
+      nginx_demo_pub_az_c_eip:
+        name: nginx_demo_pub_az_c_eip
+    ngws:
+      nginx_demo_priv_az_a_ng:
+        name: nginx_demo_priv_az_a_ng
+        subnet: nginx_demo_pub_az_a
+        eip: nginx_demo_pub_az_a_eip
+      nginx_demo_priv_az_b_ng:
+        name: nginx_demo_priv_az_b_ng
+        subnet: nginx_demo_pub_az_b
+        eip: nginx_demo_pub_az_b_eip        
+      nginx_demo_priv_az_c_ng:
+        name: nginx_demo_priv_az_c_ng
+        subnet: nginx_demo_pub_az_c
+        eip: nginx_demo_pub_az_c_eip        

@@ -55,7 +55,7 @@
   loop:
     - { key: 'id', value: "{{ result.gateway_id }}" }
 
-- name: Subnet data
+- name: Create subnets
   amazon.aws.ec2_vpc_subnet:
     vpc_id: "{{ state.vpc.vpcid }}"
     cidr: "{{ item.value.cidr }}"
@@ -69,3 +69,109 @@
   ansible.builtin.set_fact:
     state: "{{ state | combine({'vpc': {'subnets': {item.subnet.tags.Name: {'id': item.subnet.id}}}}, recursive=true) }}"
   loop: "{{ result.results }}"
+
+- name: Gather elastic IP info
+  amazon.aws.ec2_eip_info:
+  register: result
+
+- name: Dump elastic IP info into state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'eips': {item.tags.Name: {'id': item.allocation_id, 'ip': item.public_ip}}}}, recursive=true) }}"
+  loop: "{{ result.addresses }}"
+
+- name: Allocate elastic IPs
+  amazon.aws.ec2_eip:
+    tags:
+      Name: "{{ item.value.name }}"
+  loop: "{{ lookup('dict', state.vpc.eips) }}"
+  register: result
+  when: state.vpc.eips[item.value.name].id is undefined
+
+- name: Dump elastic IP info into state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'eips': {item.invocation.module_args.tags.Name: {'id': item.allocation_id}}}}, recursive=true) }}"
+  loop: "{{ result.results }}"
+  when: result.results[0].invocation.module_args.tags.Name is defined
+
+- name: Create NAT gateways
+  amazon.aws.ec2_vpc_nat_gateway:
+    subnet_id: "{{ state.vpc.subnets[item.value.subnet].id }}"
+    allocation_id: "{{ state.vpc.eips[item.value.eip].id }}"
+    client_token: "{{ item.value.name }}"
+    wait: true
+    wait_timeout: 600
+    tags:
+      Name: "{{ item.value.name }}"
+  loop: "{{ lookup('dict', state.vpc.ngws) }}"
+  register: result
+
+- name: Dump NAT gateway info into state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'ngws': {item.invocation.module_args.tags.Name: {'id': item.nat_gateway_id}}}}, recursive=true) }}"
+  loop: "{{ result.results }}"
+
+- name: Augment routing table state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'rtbs': {item.value.route_table: {'subnets': [item.value.id]}}}}, recursive=true, list_merge='append') }}"
+  loop: "{{ lookup('dict', state.vpc.subnets) }}"
+
+  # This should work, from time to time it does, mostly it does not, apart from not being idempotent being used in this way...
+- name: Create routing tables
+  amazon.aws.ec2_vpc_route_table:
+    vpc_id: "{{ state.vpc.vpcid }}"
+    routes:
+      - dest: 0.0.0.0/0
+        gateway_id: "{{ state.vpc.igws[item.value.gateway].id if item.value.gateway[-3:] == 'igw' else '' }}"
+        nat_gateway_id: "{{ state.vpc.ngws[item.value.gateway].id if item.value.gateway[-2:] == 'ng' else '' }}"
+    subnets: "{{ item.value.subnets }}"
+    tags:
+      Name: "{{ item.value.name }}"
+  loop: "{{ lookup('dict', state.vpc.rtbs) }}"
+  when:
+    - 0 > 1
+    - item.value.main is not defined
+  register: result
+
+- name: Create routing table for public networks
+  amazon.aws.ec2_vpc_route_table:
+    vpc_id: "{{ state.vpc.vpcid }}"
+    routes:
+      - dest: 0.0.0.0/0
+        gateway_id: "{{ state.vpc.igws[item.value.gateway].id }}"
+    subnets: "{{ item.value.subnets }}"
+    tags:
+      Name: "{{ item.value.name }}"
+  loop: "{{ lookup('dict', state.vpc.rtbs) }}"
+  when:
+    - item.value.main is not defined
+    - item.value.gateway[-3:] == 'igw'
+
+- name: Create routing tables for private networks
+  amazon.aws.ec2_vpc_route_table:
+    vpc_id: "{{ state.vpc.vpcid }}"
+    routes:
+      - dest: 0.0.0.0/0
+        nat_gateway_id: "{{ state.vpc.ngws[item.value.gateway].id }}"
+    subnets: "{{ item.value.subnets }}"
+    tags:
+      Name: "{{ item.value.name }}"
+  loop: "{{ lookup('dict', state.vpc.rtbs) }}"
+  when:
+    - item.value.main is not defined
+    - item.value.gateway[-2:] == 'ng'
+
+- name: Gather routing tables info
+  amazon.aws.ec2_vpc_route_table_info:
+    filters:
+      vpc-id: "{{ state.vpc.vpcid }}"
+  register: result
+
+- name: Dump routing tables info into state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'rtbs': {item.tags.Name: {'id': item.route_table_id}}}}, recursive=true) }}"
+  loop: "{{ result.route_tables }}"
+
+- name: Dump state
+  when: 0 > 1
+  ansible.builtin.debug:
+    msg: "{{ state }}"

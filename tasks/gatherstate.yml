@@ -37,7 +37,46 @@
 
 - name: Gather subnet info
   amazon.aws.ec2_vpc_subnet_info:
+  register: result
 
-- name: Dump results
+- name: Dump subnet info into state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'subnets': {item.tags.Name: {'id': item.id}}}}, recursive=true) }}"
+  loop: "{{ result.subnets }}"
+
+- name: Gather elastic IP info
+  amazon.aws.ec2_eip_info:
+  register: result
+
+- name: Dump elastic IP info into state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'eips': {item.tags.Name: {'id': item.allocation_id, 'ip': item.public_ip}}}}, recursive=true) }}"
+  loop: "{{ result.addresses }}"
+
+- name: Gather NAT gateway info
+  amazon.aws.ec2_vpc_nat_gateway_info:
+    filters:
+      vpc-id: "{{ state.vpc.vpcid }}"
+      state: available
+  register: result
+
+- name: Dump NAT gateway info into state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'ngws': {item.tags.Name: {'id': item.nat_gateway_id}}}}, recursive=true) }}"
+  loop: "{{ result.result }}"
+
+- name: Gather routing tables info
+  amazon.aws.ec2_vpc_route_table_info:
+    filters:
+      vpc-id: "{{ state.vpc.vpcid }}"
+  register: result
+
+- name: Dump routing tables info into state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'rtbs': {item.tags.Name: {'id': item.route_table_id}}}}, recursive=true) }}"
+  loop: "{{ result.route_tables }}"
+
+- name: Dump state
+  # when: 0 > 1
   ansible.builtin.debug:
     var: state

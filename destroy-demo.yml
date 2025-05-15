@@ -12,9 +12,11 @@
         file: tasks/gatherstate.yml
 
     - name: Destroy VPC
+      # when: 0 > 1
       ansible.builtin.import_tasks:
         file: tasks/destroyvpc.yml
 
     - name: Dump state
+      when: 0 > 1
       ansible.builtin.debug:
         var: state

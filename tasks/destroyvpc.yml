@@ -1,3 +1,39 @@
+---
+
+- name: Delete routing tables
+  amazon.aws.ec2_vpc_route_table:
+    vpc_id: "{{ state.vpc.vpcid }}"
+    route_table_id: "{{ item.value.id }}"
+    lookup: id
+    state: absent
+  loop: "{{ lookup('dict', state.vpc.rtbs) }}"
+  when: item.value.main is not defined
+
+- name: Delete NAT gateways
+  amazon.aws.ec2_vpc_nat_gateway:
+    state: absent
+    nat_gateway_id: "{{ item.value.id }}"
+    wait: true
+  loop: "{{ lookup('dict', state.vpc.ngws) }}"
+
+- name: Release elastic IPs
+  amazon.aws.ec2_eip:
+    release_on_disassociation: true
+    public_ip: "{{ item.value.ip }}"
+    state: absent
+    tags:
+      Name: "{{ item.value.name }}"
+  loop: "{{ lookup('dict', state.vpc.eips) }}"
+
+- name: Delete subnets
+  amazon.aws.ec2_vpc_subnet:
+    vpc_id: "{{ state.vpc.vpcid }}"
+    cidr: "{{ item.value.cidr }}"
+    tags:
+      Name: "{{ item.value.name }}"
+    state: absent
+  loop: "{{ lookup('dict', state.vpc.subnets) }}"
+
 - name: Delete internet gateway
   amazon.aws.ec2_vpc_igw:
     vpc_id: "{{ state.vpc.vpcid }}"

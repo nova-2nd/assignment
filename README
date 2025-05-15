@@ -1,3 +1,30 @@
+Quick start:
 create your venv (python3 -m venv .venv)
 activate your venv (. .venv/bin/activate)
 install requirements (pip install -r requiremnts.txt)
+aws-vault exec <profile> -- ansible-playbook -e @config.yml create-demo.yml
+
+
+It's up to you to handle authentication towards AWS.
+The ansible modules are all based on botocore (AWS CLI), so you should find your way. (AWS Vault is is your friend)
+The demo is managed via two playbook, create-demo.yml and destroy-demo.yml correspondingly.
+There is a config file (config.yml), please feel free to edit copy it to your likings.
+It's obvious that the structure of that config file is quite simple, names are the references...
+At runtime make sure include it (e.g. aws-vault exec <profile> -- ansible-playbook -e @config.yml create-demo.yml)
+
+Conceptualy the config gets loaded into a "runstate", which gets then augmented with with available runtime information.
+At the end, the final state is dumped to the console
+
+This deployment creates its own vpc and care has been taken to not influence foreign ressources, still you are strongly
+advised to run this in a non prodictive region. The cleanup should not leave any remains...
+
+An architecture overview can be found under docs, not pretty but it fulfills its purpose. Technically its kept as simple
+as possible, one private, one public subnet per az over 3 az's. the container nodes NAT out of the private subnets.
+
+The container hosting is ECS on Fargate and an ALB homed in all three public azs which does the ingress/SSL termination
+to the container(hosts). The security groups for the LB and the container hosts restrict access to a minimum.
+In case of higher security needs it could be considered to implement EKR and get rid of the NAT gateways.
+
+The available ansible modules for aws are not massively great, documentation is lacking and wrong. The reliability of
+the code potential for developement, meaning that this deployment is not failsafe.
+

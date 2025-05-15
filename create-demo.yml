@@ -15,6 +15,6 @@
       ansible.builtin.import_tasks:
         file: tasks/createvpc.yml
 
-    - name: Dump config
+    - name: Final state dump
       ansible.builtin.debug:
         msg: "{{ state }}"
