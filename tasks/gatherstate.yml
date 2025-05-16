@@ -76,7 +76,31 @@
     state: "{{ state | combine({'vpc': {'rtbs': {item.tags.Name: {'id': item.route_table_id}}}}, recursive=true) }}"
   loop: "{{ result.route_tables }}"
 
-- name: Dump state
+- name: Gather security group info
+  amazon.aws.ec2_security_group_info:
+    filters:
+      vpc-id: "{{ state.vpc.vpcid }}"
+  register: result
+
+- name: Dump security group info into state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'sgs': {item.group_name: {'id': item.group_id}}}}, recursive=true) }}"
+  loop: "{{ result.security_groups }}"
+  when: not item.group_name == 'default'
+
+- name: Gather ALB info
+  amazon.aws.elb_application_lb_info:
+    names: "{{ state.vpc.alb.nginx_demo_alb.name }}"
+  register: result
+  ignore_errors: true
+
+- name: Dump ALB info into state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'alb': {'nginx_demo_alb': {'dns': item.dns_name}}}}, recursive=true) }}"
+  loop: "{{ result.load_balancers }}"
+  ignore_errors: true
+
+- name: Dump result
   # when: 0 > 1
   ansible.builtin.debug:
-    var: state
+    var: result

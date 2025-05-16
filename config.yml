@@ -4,6 +4,60 @@ config:
     name: nginx_demo
     cidr: 10.0.0.0/16
     dopt_name: nginx_demo_dopts
+    alb:
+      nginx_demo_alb:
+        name: nginx-demo-lb
+        sg: nginx_demo_alb_sg
+        subnets: nginx_demo_pub_rt
+        target_group_name: nginx-demo-lb-tg
+    ecs:
+      cluster:
+        name: nginx_demo_ecs_cluster
+      task_definition:
+        name: nginx_demo_taskdef
+      service:
+        name: nginx_demo_service
+    sgs:
+      nginx_demo_alb_sg:
+        name: nginx_demo_alb_sg
+        description: Security group for the load balancer
+        rules:
+          - proto: tcp
+            from_port: 80
+            to_port: 80
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            from_port: 443
+            to_port: 443
+            cidr_ip: 0.0.0.0/0
+        rules_egress:
+          - proto: tcp
+            from_port: 80
+            to_port: 80
+            group_name: nginx_demo_ecs_sg
+            group_desc: Security group for the container hosts
+      nginx_demo_ecs_sg:
+        name: nginx_demo_ecs_sg
+        description: Security group for the container hosts
+        rules:
+          - proto: tcp
+            from_port: 80
+            to_port: 80
+            group_name: nginx_demo_alb_sg
+            group_desc: Security group for the load balancer
+        rules_egress:
+          - proto: tcp
+            from_port: 53
+            to_port: 53
+            cidr_ip: 0.0.0.0/0
+          - proto: udp
+            from_port: 53
+            to_port: 53
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            from_port: 443
+            to_port: 443
+            cidr_ip: 0.0.0.0/0            
     igws:
       nginx_demo_igw:
         name: nginx_demo_igw

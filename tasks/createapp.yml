@@ -1,0 +1,203 @@
+---
+- name: Create security groups
+  amazon.aws.ec2_security_group:
+    name: "{{ item.value.name }}"
+    vpc_id: "{{ state.vpc.vpcid }}"
+    description: "{{ item.value.description }}"
+    rules: "{{ item.value.rules }}"
+    rules_egress: "{{ item.value.rules_egress }}"
+  loop: "{{ lookup('dict', state.vpc.sgs) }}"
+  register: result
+
+- name: Dump results
+  ansible.builtin.debug:
+    msg: "{{ result }}"
+
+- name: Dump security group info into state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'sgs': {item.group_name: {'id': item.group_id}}}}, recursive=true) }}"
+  loop: "{{ result.results }}"
+
+- name: Check if ALB exists (Idempotency fix)
+  amazon.aws.elb_application_lb_info:
+  register: albcheck
+
+- name: Dump alb Check
+  ansible.builtin.debug:
+    msg: "{{ albcheck }}"
+
+- name: Dump ALB info into state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'alb': {'nginx_demo_alb': {'dns': item.dns_name}}}}, recursive=true) }}"
+  loop: "{{ albcheck.load_balancers }}"
+  when: albcheck.load_balancers[0] is defined
+
+- name: Create ALB
+  amazon.aws.elb_application_lb:
+    name: "{{ state.vpc.alb.nginx_demo_alb.name }}"
+    security_groups: "{{ state.vpc.alb.nginx_demo_alb.sg }}"
+    subnets: "{{ state.vpc.rtbs[state.vpc.alb.nginx_demo_alb.subnets]['subnets'] }}"
+  register: result
+  when: albcheck.load_balancers[0] is undefined
+
+- name: Dump ALB info into state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'alb': {'nginx_demo_alb': {'dns': result.dns_name}}}}, recursive=true) }}"
+  when: albcheck.load_balancers[0] is undefined
+
+- name: Create ALB target group
+  community.aws.elb_target_group:
+    name: "{{ state.vpc.alb.nginx_demo_alb.target_group_name }}"
+    target_type: ip
+    protocol: http
+    port: 80
+    health_check_path: /
+    health_check_protocol: http
+    health_check_port: 80
+    protocol_version: HTTP1
+    vpc_id: "{{ state.vpc.vpcid }}"
+    state: present
+  register: result
+
+- name: Dump ALB target group info into state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'alb': {'nginx_demo_alb': {'targetarn': result.target_group_arn}}}}, recursive=true) }}"
+
+- name: Check if private key exists
+  ansible.builtin.stat:
+    path: artifacts/nginx-demo.pem
+  register: privkey
+
+- name: Create private key for certificate
+  community.crypto.openssl_privatekey:
+    path: artifacts/nginx-demo.pem
+    type: ECC
+    curve: secp256r1
+  when: not privkey.stat.exists
+
+- name: Check if certificate exists
+  ansible.builtin.stat:
+    path: "artifacts/{{ state.vpc.alb.nginx_demo_alb.dns }}.pem"
+  register: certificate
+
+- name: Create CSR
+  community.crypto.openssl_csr_pipe:
+    privatekey_path: artifacts/nginx-demo.pem
+    common_name: "{{ state.vpc.alb.nginx_demo_alb.dns }}"
+    organization_name: assignment
+    subject_alt_name:
+      - "DNS:{{ state.vpc.alb.nginx_demo_alb.dns }}"
+  register: csr
+  when: not certificate.stat.exists
+
+- name: Self sign certificate
+  community.crypto.x509_certificate:
+    path: "artifacts/{{ state.vpc.alb.nginx_demo_alb.dns }}.pem"
+    csr_content: "{{ csr.csr }}"
+    privatekey_path: artifacts/nginx-demo.pem
+    provider: selfsigned
+  when: not certificate.stat.exists
+
+- name: Upload certificate to ACM
+  community.aws.acm_certificate:
+    certificate: "{{ lookup('file', 'artifacts/' + state.vpc.alb.nginx_demo_alb.dns + '.pem') }}"
+    # certificate: "artifacts/{{ state.vpc.alb.nginx_demo_alb.dns }}.pem"
+    # private_key: artifacts/nginx-demo.pem
+    private_key: "{{ lookup('file', 'artifacts/nginx-demo.pem') }}"
+    name_tag: nxing-demo-certificate
+  register: result
+
+- name: Dump certificate info into state
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'alb': {'nginx_demo_alb': {'acm_cert': result.certificate.arn}}}}, recursive=true) }}"
+
+- name: Configure ALB
+  amazon.aws.elb_application_lb:
+    name: "{{ state.vpc.alb.nginx_demo_alb.name }}"
+    security_groups: "{{ state.vpc.alb.nginx_demo_alb.sg }}"
+    subnets: "{{ state.vpc.rtbs[state.vpc.alb.nginx_demo_alb.subnets]['subnets'] }}"
+    listeners:
+      - Protocol: HTTP
+        Port: 80
+        DefaultActions:
+          - Type: forward
+            TargetGroupName: "{{ state.vpc.alb.nginx_demo_alb.target_group_name }}"
+        Rules:
+          - Conditions:
+              - Field: path-pattern
+                Values:
+                  - '/'
+            Priority: 1
+            Actions:
+              - Type: redirect
+                RedirectConfig:
+                  Host: '#{host}'
+                  Path: /#{path}
+                  Port: '443'
+                  Protocol: HTTPS
+                  Query: '#{query}'
+                  StatusCode: HTTP_301
+      - Protocol: HTTPS
+        Port: 443
+        SslPolicy: ELBSecurityPolicy-2015-05
+        Certificates:
+          - CertificateArn: "{{ state.vpc.alb.nginx_demo_alb.acm_cert }}"
+        DefaultActions:
+          - Type: forward
+            TargetGroupName: "{{ state.vpc.alb.nginx_demo_alb.target_group_name }}"
+
+- name: Create ECS cluster
+  community.aws.ecs_cluster:
+    name: "{{ state.vpc.ecs.cluster.name }}"
+    capacity_providers:
+      - FARGATE
+      - FARGATE_SPOT
+    capacity_provider_strategy:
+      - capacity_provider: FARGATE
+        base: 1
+        weight: 1
+      - capacity_provider: FARGATE_SPOT
+        weight: 100
+    purge_capacity_providers: true
+    state: present
+  register: result
+
+- name: Create ECS task definition
+  community.aws.ecs_taskdefinition:
+    family: "{{ state.vpc.ecs.task_definition.name }}"
+    containers:
+      - name: nginx-hello
+        essential: true
+        image: nginxdemos/hello
+        portMappings:
+          - containerPort: 80
+            hostPort: 80
+    cpu: 1024
+    memory: 3072
+    network_mode: awsvpc
+    state: present
+  register: result
+
+- name: Augment ECS state with subnets
+  ansible.builtin.set_fact:
+    state: "{{ state | combine({'vpc': {'ecs': {'service': {'subnets': [item.value.id]}}}}, recursive=true, list_merge='append') }}"
+  loop: "{{ lookup('dict', state.vpc.subnets) }}"
+  when: '"_priv_" in item.value.name'
+
+- name: Create ECS service
+  # when: 0 > 1
+  community.aws.ecs_service:
+    name: "{{ state.vpc.ecs.service.name }}"
+    cluster: "{{ state.vpc.ecs.cluster.name }}"
+    task_definition: "{{ state.vpc.ecs.task_definition.name }}"
+    desired_count: 3
+    network_configuration:
+      subnets: "{{ state.vpc.ecs.service.subnets }}"
+      security_groups: "{{ state.vpc.sgs.nginx_demo_ecs_sg.id }}"
+      assign_public_ip: false
+    load_balancers:
+      - targetGroupArn: "{{ state.vpc.alb.nginx_demo_alb.targetarn }}"
+        containerName: nginx-hello
+        containerPort: 80
+    state: present
+...

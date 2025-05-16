@@ -15,6 +15,18 @@
       ansible.builtin.import_tasks:
         file: tasks/createvpc.yml
 
+    - name: Create App
+      ansible.builtin.import_tasks:
+        file: tasks/createapp.yml
+
     - name: Final state dump
       ansible.builtin.debug:
         msg: "{{ state }}"
+
+    - name: Info dump to user
+      ansible.builtin.debug:
+        msg:
+          - "------ Find the app deployed here ---------"
+          - "http://{{ state.vpc.alb.nginx_demo_alb.dns }}"
+          - "------ Find the app deployed here ---------"
+...

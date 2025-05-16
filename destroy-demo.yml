@@ -2,6 +2,11 @@
 - name: Destroy nginx-demo
   hosts: localhost
   gather_facts: false
+  vars_prompt:
+    - name: warning
+      prompt: "!!!! The following is not implemented by now and has to be done manually\
+       before continuing, \ndelete ECS service\ndelete ECS cluster\ndelete ECS task definition\n\
+       delete load balancer listener\ndelete loadbalancer target group"
   tasks:
     - name: Copy config to state
       ansible.builtin.set_fact:
@@ -12,11 +17,15 @@
         file: tasks/gatherstate.yml
 
     - name: Destroy VPC
-      # when: 0 > 1
       ansible.builtin.import_tasks:
         file: tasks/destroyvpc.yml
+
+    - name: Destroy App
+      ansible.builtin.import_tasks:
+        file: tasks/destroyapp.yml
 
     - name: Dump state
       when: 0 > 1
       ansible.builtin.debug:
         var: state
+...

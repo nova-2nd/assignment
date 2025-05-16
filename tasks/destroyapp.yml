@@ -1,0 +1,23 @@
+---
+- name: Delete ALB
+  amazon.aws.elb_application_lb:
+    name: "{{ state.vpc.alb.nginx_demo_alb.name }}"
+    wait: true
+    wait_timeout: 60
+    state: absent
+
+- name: Purge rules of security groups
+  amazon.aws.ec2_security_group:
+    group_id: "{{ item.value.id }}"
+    name: "{{ item.value.name }}"
+    description: "{{ item.value.description }}"
+    purge_rules: true
+    purge_rules_egress: true
+  loop: "{{ lookup('dict', state.vpc.sgs) }}"
+
+- name: Delete security groups
+  amazon.aws.ec2_security_group:
+    group_id: "{{ item.value.id }}"
+    state: absent
+  loop: "{{ lookup('dict', state.vpc.sgs) }}"
+...

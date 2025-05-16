@@ -12,6 +12,7 @@
   loop:
     - { key: 'vpcid', value: "{{ result.vpc.id }}" }
     - { key: 'dopt_id', value: "{{ result.vpc.dhcp_options_id }}" }
+    - { key: 'owner', value: "{{ result.vpc.owner_id }}" }
 
 - name: Rename DHCP option state
   amazon.aws.ec2_vpc_dhcp_option:
@@ -170,8 +171,3 @@
   ansible.builtin.set_fact:
     state: "{{ state | combine({'vpc': {'rtbs': {item.tags.Name: {'id': item.route_table_id}}}}, recursive=true) }}"
   loop: "{{ result.route_tables }}"
-
-- name: Dump state
-  when: 0 > 1
-  ansible.builtin.debug:
-    msg: "{{ state }}"
