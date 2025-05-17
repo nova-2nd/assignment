@@ -1,17 +1,22 @@
-Quick start:
-create your venv (python3 -m venv .venv)
-activate your venv (. .venv/bin/activate)
-install requirements (pip install -r requiremnts.txt)
-aws-vault exec <profile> -- ansible-playbook -e @config.yml create-demo.yml
-aws-vault exec <profile> -- ansible-playbook -e @config.yml destroy-demo.yml
+### Quick start ansible:
+- create your venv (python3 -m venv .venv)
+- activate your venv (. .venv/bin/activate)
+- install requirements (pip install -r requiremnts.txt)
+- aws-vault exec <profile> -- ansible-playbook -e @config.yml create-demo.yml
+- aws-vault exec <profile> -- ansible-playbook -e @config.yml destroy-demo.yml
 
+### Quick start terraform:
+- aws-vault exec <profile> -- terraform apply
+- aws-vault exec <profile> -- terraform destroy
+
+### Authentication
 It's up to you to handle authentication towards AWS.
-The ansible modules are all based on botocore (AWS CLI), so you should find your way. (AWS Vault is is your friend)
+(AWS Vault is is your friend)
 
+### Ansible
 The demo is managed via two playbook, create-demo.yml and destroy-demo.yml correspondingly.
 There is a config file (config.yml), please feel free to edit copy it to your likings.
 It's obvious that the structure of that config file is quite simple, names are the references...
-At runtime make sure to include it (e.g. aws-vault exec <profile> -- ansible-playbook -e @config.yml create-demo.yml)
 
 Conceptualy the config gets loaded into a "runstate", which gets then augmented with with information during runtime.
 At the end, the final state is dumped to the console
@@ -19,17 +24,22 @@ At the end, the final state is dumped to the console
 This deployment creates its own vpc and care has been taken to not influence foreign ressources, still you are strongly
 advised to run this in a non prodictive region. The cleanup should not leave any remains...
 
-An architecture overview can be found under docs, not pretty but it fulfills its purpose. Technically its kept as simple
-as possible, one private, one public subnet per az over 3 az's. the container nodes NAT out of the private subnets.
-
-The container hosting is ECS on Fargate and an ALB homed in all three public azs which does the ingress/SSL termination
-to the container(hosts). The security groups for the LB and the container hosts restrict access to a minimum.
-For more security it could be considered to implement,
-- ECR and get rid of the NAT gateways
-- WAF
 
 The available ansible modules for aws are not massively great. Some of them implement a wait feature till task completion, which frankly does not work. Therefore this runs in a situation where a followup step fails because of the earlier step not completely finished. (NAT gatway is such a candidate, next to others).
 
 In short this is not production quality and as long the the corresponding ansible modules get better it never will be (AWS with ansible).
 
-Have fun (at least try to)
+### Terraform
+In it's default the deployment spans over all available az's if you want/need a smaller deployment you can controll that via the az-width variable (aws-vault exec <profile> -- terraform apply -var "az-width=2")
+
+### Architecture
+An architecture overview can be found under docs, not pretty but it fulfills its purpose. Technically its kept as simple
+as possible, one private, one public subnet per az over 3 az's. the container nodes NAT out of the private subnets.
+
+The container hosting is ECS on Fargate and an ALB homed in all three public azs which does the ingress/SSL termination
+to the container(hosts). The security groups for the LB and the container hosts restrict access to a minimum.
+
+### Advancements
+For more security it could be considered to implement,
+- ECR (and get rid of the NAT gateways)
+- WAF
